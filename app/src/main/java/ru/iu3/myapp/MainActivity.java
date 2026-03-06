@@ -3,7 +3,12 @@ package ru.iu3.myapp;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.os.Bundle;
+import android.view.View;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Hex;
 
 import java.util.Arrays;
 
@@ -41,6 +46,26 @@ public class MainActivity extends AppCompatActivity {
         // tv.setText(Arrays.toString(originalBytes));
         // tv.setText(Arrays.toString(encryptedBytes));
         // tv.setText(Arrays.toString(decryptedBytes));
+        // Toast.makeText(this, "Hello", Toast.LENGTH_SHORT).show();
+    }
+
+    public static byte[] stringToHex(String s)
+    {
+        byte[] hex;
+        try
+        {
+            hex = Hex.decodeHex(s.toCharArray());
+        }
+        catch (DecoderException ex)
+        {
+            hex = null;
+        }
+        return hex;
+    }
+
+    public void onButtonClick(View v)
+    {
+        Toast.makeText(this, "Hello", Toast.LENGTH_SHORT).show();
     }
 
     /**
