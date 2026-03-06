@@ -46,15 +46,14 @@ public class MainActivity extends AppCompatActivity implements TransactionEvents
         byte[] encryptedBytes = encrypt(encryptionKey, originalBytes);
         byte[] decryptedBytes = decrypt(encryptionKey, encryptedBytes);;
 
+
+        log("Enc Key" + Arrays.toString(encryptionKey));
+        log("Orig Bytes" + Arrays.toString(originalBytes));
+        log("Enc Bytes" + Arrays.toString(encryptedBytes));
+        log("Dec Bytes" + Arrays.toString(decryptedBytes));
         // Example of a call to a native method
         TextView tv = binding.sampleText;
         // tv.setText(stringFromJNI());
-
-        // tv.setText(initializationStatus);
-        // tv.setText(Arrays.toString(encryptionKey));
-        // tv.setText(Arrays.toString(originalBytes));
-        // tv.setText(Arrays.toString(encryptedBytes));
-        // tv.setText(Arrays.toString(decryptedBytes));
         // Toast.makeText(this, "Hello", Toast.LENGTH_SHORT).show();
 
         activityResultLauncher  = registerForActivityResult(
@@ -105,6 +104,7 @@ public class MainActivity extends AppCompatActivity implements TransactionEvents
     @Override
     public String enterPin(int ptc, String amount) {
         pin = new String();
+        log("enterPin работает");
         Intent it = new Intent(MainActivity.this, PinpadActivity.class);
         it.putExtra("ptc", ptc);
         it.putExtra("amount", amount);
@@ -113,7 +113,7 @@ public class MainActivity extends AppCompatActivity implements TransactionEvents
             try {
                 MainActivity.this.wait();
             } catch (Exception ex) {
-                //todo: log error
+                log(ex.toString());
             }
         }
         return pin;
@@ -142,6 +142,8 @@ public class MainActivity extends AppCompatActivity implements TransactionEvents
      * which is packaged with this application.
      */
     public native String stringFromJNI();
+
+    public static native void log(String str);
     public static native int initRng();
     public static native byte[] randomBytes(int no);
     public static native byte[] encrypt(byte[] key, byte[] data);

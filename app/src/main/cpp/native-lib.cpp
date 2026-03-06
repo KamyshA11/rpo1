@@ -25,6 +25,17 @@ Java_ru_iu3_myapp_MainActivity_stringFromJNI(JNIEnv* env, jobject /* this */) {
     return env->NewStringUTF(hello.c_str());
 }
 
+extern "C"
+JNIEXPORT void JNICALL
+Java_ru_iu3_myapp_MainActiAvity_log(JNIEnv *env, jclass /* this */, jstring str) {
+    const char *nativeString = env->GetStringUTFChars(str, 0);
+    if (nativeString == NULL) {
+        return;
+    }
+    SLOG_INFO(nativeString);
+    env->ReleaseStringUTFChars(str, nativeString);
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_ru_iu3_myapp_MainActivity_initRng(JNIEnv *env, jclass clazz) {
     mbedtls_entropy_init( &entropy );
@@ -50,31 +61,43 @@ Java_ru_iu3_myapp_MainActivity_encrypt(JNIEnv *env, jclass, jbyteArray key, jbyt
 {
     jsize ksz = env->GetArrayLength(key);
     jsize dsz = env->GetArrayLength(data);
-    if ((ksz != 16) || (dsz <= 0)) {
+
+    if ((ksz != 16) || (dsz <= 0))
         return env->NewByteArray(0);
-    }
+
     mbedtls_des3_context ctx;
     mbedtls_des3_init(&ctx);
 
-    jbyte * pkey = env->GetByteArrayElements(key, 0);
+    jbyte *pkey = env->GetByteArrayElements(key, 0);
+    jbyte *pdata = env->GetByteArrayElements(data, 0);
 
-    // Паддинг PKCS#5
-    int rst = dsz % 8;
-    int sz = dsz + 8 - rst;
-    uint8_t * buf = new uint8_t[sz];
-    for (int i = 7; i > rst; i--)
-        buf[dsz + i] = rst;
-    jbyte * pdata = env->GetByteArrayElements(data, 0);
+    int pad = 8 - (dsz % 8);
+    int sz = dsz + pad;
+
+    uint8_t *buf = new uint8_t[sz];
+
     std::copy(pdata, pdata + dsz, buf);
-    mbedtls_des3_set2key_enc(&ctx, (uint8_t *)pkey);
+
+    // PKCS#5 padding
+    for (int i = 0; i < pad; i++)
+        buf[dsz + i] = pad;
+
+    mbedtls_des3_set2key_enc(&ctx, (uint8_t*)pkey);
+
     int cn = sz / 8;
     for (int i = 0; i < cn; i++)
         mbedtls_des3_crypt_ecb(&ctx, buf + i*8, buf + i*8);
+
     jbyteArray dout = env->NewByteArray(sz);
-    env->SetByteArrayRegion(dout, 0, sz, (jbyte *)buf);
+    env->SetByteArrayRegion(dout, 0, sz, (jbyte*)buf);
+
     delete[] buf;
+
     env->ReleaseByteArrayElements(key, pkey, 0);
     env->ReleaseByteArrayElements(data, pdata, 0);
+
+    mbedtls_des3_free(&ctx);
+
     return dout;
 }
 
@@ -83,31 +106,49 @@ Java_ru_iu3_myapp_MainActivity_decrypt(JNIEnv *env, jclass, jbyteArray key, jbyt
 {
     jsize ksz = env->GetArrayLength(key);
     jsize dsz = env->GetArrayLength(data);
-    if ((ksz != 16) || (dsz <= 0) || ((dsz % 8) != 0)) {
+
+    if ((ksz != 16) || (dsz <= 0) || (dsz % 8 != 0))
         return env->NewByteArray(0);
-    }
+
     mbedtls_des3_context ctx;
     mbedtls_des3_init(&ctx);
 
-    jbyte * pkey = env->GetByteArrayElements(key, 0);
+    jbyte *pkey = env->GetByteArrayElements(key, 0);
+    jbyte *pdata = env->GetByteArrayElements(data, 0);
 
-    uint8_t * buf = new uint8_t[dsz];
-
-    jbyte * pdata = env->GetByteArrayElements(data, 0);
+    uint8_t *buf = new uint8_t[dsz];
     std::copy(pdata, pdata + dsz, buf);
-    mbedtls_des3_set2key_dec(&ctx, (uint8_t *)pkey);
+
+    mbedtls_des3_set2key_dec(&ctx, (uint8_t*)pkey);
+
     int cn = dsz / 8;
     for (int i = 0; i < cn; i++)
-        mbedtls_des3_crypt_ecb(&ctx, buf + i*8, buf +i*8);
+        mbedtls_des3_crypt_ecb(&ctx, buf + i*8, buf + i*8);
 
-    //PKCS#5. упрощено. по соображениям безопасности надо проверить каждый байт паддинга
-    int sz = dsz - 8 + buf[dsz-1];
+    int pad = buf[dsz - 1];
+
+    // проверка padding
+    if (pad < 1 || pad > 8)
+    {
+        delete[] buf;
+        env->ReleaseByteArrayElements(key, pkey, 0);
+        env->ReleaseByteArrayElements(data, pdata, 0);
+        mbedtls_des3_free(&ctx);
+        return env->NewByteArray(0);
+    }
+
+    int sz = dsz - pad;
 
     jbyteArray dout = env->NewByteArray(sz);
-    env->SetByteArrayRegion(dout, 0, sz, (jbyte *)buf);
+    env->SetByteArrayRegion(dout, 0, sz, (jbyte*)buf);
+
     delete[] buf;
+
     env->ReleaseByteArrayElements(key, pkey, 0);
     env->ReleaseByteArrayElements(data, pdata, 0);
+
+    mbedtls_des3_free(&ctx);
+
     return dout;
 }
 
